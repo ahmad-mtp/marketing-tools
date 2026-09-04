@@ -109,10 +109,14 @@ APOLLO_WEBHOOK_URL=https://your-public-url/api/apollo/webhook
 ssh -R 80:localhost:8787 nokey@localhost.run     # prints a public URL
 ```
 
-**Deploy the receiver properly before relying on this.** Free tunnels get a new
-random URL each start and die after a few hours — three died in one afternoon
-during development. The receiver is small enough for a Cloudflare Worker or a
-Vercel function, which gives a permanent URL and removes the problem.
+The tunnel is a **stopgap**: free ones get a new random URL on every start and
+expire after a few hours — three died in one afternoon during development. Each
+time, `APOLLO_WEBHOOK_URL` has to be updated and the dashboard restarted.
+
+Give the receiver a permanent home and that goes away for good.
+**[docs/webhook-deployment.md](docs/webhook-deployment.md)** covers it: systemd
+unit, TLS termination, verification, and the serverless alternatives if a whole
+server is overkill.
 
 The receiver is deliberately a **separate app** from the dashboard. Exposing the
 dashboard would put `/api/scrape` and `/api/connect` on the public internet,
@@ -240,7 +244,10 @@ back.
   cannot re-create, cannot be cloned or driven. The `bulk-snippet-workaround`
   branch handles that case with a console snippet pasted into the operator's
   own browser.
-- **Free tunnels are not fit for routine use.** Deploy the receiver.
+- **Free tunnels are not fit for routine use.** The URL changes on every
+  restart and expires within hours. See
+  [docs/webhook-deployment.md](docs/webhook-deployment.md) for a permanent
+  home; until then, expect to re-point `APOLLO_WEBHOOK_URL` most sessions.
 - **One operator per running instance.** State is a module-level singleton.
 - **LinkedIn's terms prohibit automated scraping.** Enforcement in practice is
   rate limiting, then restriction. Reading one page you already opened is a
