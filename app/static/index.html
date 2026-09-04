@@ -47,16 +47,7 @@
   #phase2 label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12.5px}
   #phase2 select,#phase2 input{font:inherit;padding:7px 9px;border-radius:7px;
     border:1px solid var(--line);background:var(--card);color:var(--ink)}
-  .phase{border-left:3px solid var(--line);padding:2px 0 2px 16px;margin:0 0 18px}
-  .phase-h{font-weight:600;font-size:13.5px;margin-bottom:8px;display:flex;gap:8px;align-items:center}
-  .badge{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;
-    background:var(--accent);color:#fff;font-size:11px;font-weight:700}
-  .howto{margin:0 0 12px;padding-left:20px;color:var(--mut);font-size:13px;line-height:1.7}
   .howto li{margin:3px 0} .howto b{color:var(--ink)}
-  code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
-  #folderPath{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-  #pasteJson{width:100%;margin-top:10px;font:12px ui-monospace,monospace;padding:9px;
-    border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
   .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
 </style>
 </head>
@@ -64,55 +55,6 @@
 <div class="wrap">
   <h1>Event Attendee Harvester</h1>
   <p class="sub">LinkedIn event → CSV. <span class="tag" id="mode">…</span> <span class="tag" id="client"></span></p>
-
-  <div class="card" id="importCard">
-    <strong>Scrape from a browser this tool can&rsquo;t drive</strong>
-    <p class="sub" style="margin:6px 0 16px">
-      Use this when the LinkedIn session lives somewhere we can&rsquo;t automate &mdash;
-      an incognito window, or a colleague&rsquo;s login. <b>Nothing needs to be
-      connected, quit, or signed into.</b>
-    </p>
-
-    <div class="phase">
-      <div class="phase-h"><span class="badge">A</span> In the window that&rsquo;s logged in</div>
-      <ol class="howto">
-        <li>Open the <b>attendee list</b> so you can see the people.</li>
-        <li>Come back here and click <b>Copy snippet</b> &mdash; it goes to your clipboard.</li>
-        <li>Back in that window, press <b>&#8984; &#8997; J</b> to open the console.</li>
-        <li>If Chrome warns about pasting: type <code>allow pasting</code>, press Enter.</li>
-        <li>Paste with <b>&#8984;V</b> and press <b>Enter</b>.</li>
-        <li>Wait. You&rsquo;ll see <code>round 1: 12 people</code> counting up, then a popup
-            saying how many were found.</li>
-      </ol>
-      <div class="row"><button class="primary" id="btnCopySnippet">Copy snippet</button></div>
-    </div>
-
-    <div class="phase">
-      <div class="phase-h"><span class="badge">B</span> Back here</div>
-      <ol class="howto" start="7">
-        <li>The results are on your clipboard <i>and</i> saved as
-            <code>linkedin-attendees.json</code> in Downloads &mdash; either will do.</li>
-        <li>Paste into the box below <b>or</b> choose the downloaded file.</li>
-        <li>Click <b>Import rows</b>. The count appears next to the button.</li>
-      </ol>
-      <textarea id="pasteJson" rows="3" placeholder="Paste here (&#8984;V)"></textarea>
-      <div class="row" style="align-items:center;margin-top:4px">
-        <input id="folderPath" placeholder="…or a folder of .json scrapes, e.g. eev_event/raw"
-               style="flex:1;min-width:260px">
-        <button id="btnImportFolder">Consolidate folder</button>
-      </div>
-      <div class="row" style="align-items:center">
-        <button id="btnImport">Import rows</button>
-        <span style="color:var(--mut);font-size:12px">or</span>
-        <input type="file" id="fileJson" accept="application/json,.json" multiple>
-        <span class="tag" id="importMsg"></span>
-      </div>
-    </div>
-
-    <p class="sub" style="margin:14px 0 0">
-      Then: <b>Enrich with Apollo</b> &rarr; <b>Save CSV to disk</b>, further down.
-    </p>
-  </div>
 
   <div class="card">
     <ul class="steps">
@@ -359,63 +301,6 @@ $('btnEnrich').onclick = async e => {
 };
 $('btnStopEnrich').onclick = async () => { try { await post('/api/stop-enrich'); } catch(err){ alert(err.message); } tick(); };
 $('btnStopProfiles').onclick = async () => { try { await post('/api/stop-profiles'); } catch(err){ alert(err.message); } tick(); };
-$('btnCopySnippet').onclick = async e => {
-  try {
-    const js = await fetch('/api/snippet.js').then(r => r.text());
-    await navigator.clipboard.writeText(js);
-    e.target.textContent = 'Copied \u2713';
-    setTimeout(() => e.target.textContent = 'Copy snippet', 2500);
-  } catch (err) { alert('Could not copy: ' + err.message); }
-};
-
-async function importPayload(text) {
-  let payload;
-  try { payload = JSON.parse(text); }
-  catch (e) { return alert('That is not valid JSON.'); }
-  if (!payload.rows) return alert('No "rows" in that JSON.');
-  try {
-    const r = await fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'},
-                                          body: JSON.stringify(payload)});
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.detail || r.statusText);
-    $('importMsg').textContent = 'imported ' + j.imported + ' rows';
-    $('pasteJson').value = ''; previewed = false; tick();
-  } catch (err) { alert(err.message); }
-}
-$('btnImport').onclick = () => {
-  const t = $('pasteJson').value.trim();
-  if (!t) return alert('Paste the JSON first.');
-  importPayload(t);
-};
-$('fileJson').onchange = async e => {
-  const files = [...e.target.files]; if (!files.length) return;
-  let total = 0;
-  for (let i = 0; i < files.length; i++) {
-    try {
-      const payload = JSON.parse(await files[i].text());
-      payload.append = i > 0;              // first replaces, rest merge in
-      const r = await fetch('/api/import', {method:'POST',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      const j = await r.json();
-      if (r.ok) total = j.imported;
-    } catch (err) { console.warn(files[i].name, err); }
-  }
-  $('importMsg').textContent = files.length + ' files \u2192 ' + total + ' unique people';
-  e.target.value = ''; previewed = false; tick();
-};
-$('btnImportFolder').onclick = async () => {
-  const path = $('folderPath').value.trim();
-  if (!path) return alert('Enter the folder path first.');
-  try {
-    const r = await fetch('/api/import-folder', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify({path})});
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.detail || r.statusText);
-    $('importMsg').textContent =
-      `${j.files} files, ${j.entries} entries \u2192 ${j.unique} unique (${j.duplicates} dupes)`;
-    previewed = false; tick();
-  } catch (err) { alert(err.message); }
-};
 $('btnClear').onclick = async () => {
   if (!confirm('Discard the current rows?')) return;
   try { await post('/api/clear'); previewed = false; $('preview').hidden = true; }
