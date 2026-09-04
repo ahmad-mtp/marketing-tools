@@ -1,0 +1,21 @@
+# --- environment ---
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# --- runtime state (contains scraped personal data) ---
+data/
+!data/.gitkeep
+
+# --- harvested data: never commit real people's contact details ---
+# Event folders hold raw LinkedIn scrapes and enriched CSVs with emails
+# and phone numbers. Keep them local.
+eev_event/
+*_event/
+attendees*.csv
+attendees*.json
+linkedin-attendees*.json
+
+# --- macOS ---
+.DS_Store

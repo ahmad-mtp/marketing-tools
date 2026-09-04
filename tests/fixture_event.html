@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fixture Event | LinkedIn</title>
+<style>
+  body{font-family:sans-serif;margin:0}
+  .backdrop{position:fixed;inset:0;background:#0006;display:grid;place-items:center}
+  [role=dialog]{background:#fff;width:520px;height:420px;display:flex;flex-direction:column;border-radius:8px}
+  .hdr{padding:14px;border-bottom:1px solid #ddd;font-weight:600}
+  .scroller{overflow-y:auto;flex:1;padding:8px}
+  li{list-style:none;display:flex;gap:10px;padding:10px;border-bottom:1px solid #eee}
+  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  img{width:40px;height:40px;background:#ccd;border-radius:50%}
+</style></head>
+<body>
+<div class="backdrop"><div role="dialog" aria-label="Attendees">
+  <div class="hdr">Attendees</div>
+  <div class="scroller"><ul id="list"></ul></div>
+</div></div>
+<script>
+// 60 synthetic attendees; the list lazy-appends 12 at a time on scroll,
+// exactly like an infinite-scroll modal.
+const FIRST=['Sarah','Ahmed','Priya','Tom','Lena','Marco','Yuki','Nadia','Omar','Chloe','Ivan','Grace'];
+const LAST=['Taylor','Khan','Menon','Alvarez','Fischer','Rossi','Tanaka','Haddad','Silva','Dubois'];
+const ROLE=['VP Marketing','Head of Growth','Demand Gen Manager','CMO','Content Lead','Brand Director'];
+const CO=['Acme Corp','Northwind','Globex','Initech','Umbrella Ltd','Soylent'];
+const DEG=['1st','2nd','3rd'];
+const PEOPLE=[...Array(60)].map((_,i)=>({
+  slug:`${FIRST[i%FIRST.length].toLowerCase()}-${LAST[i%LAST.length].toLowerCase()}-${i}`,
+  name:`${FIRST[i%FIRST.length]} ${LAST[i%LAST.length]}`,
+  headline:`${ROLE[i%ROLE.length]} at ${CO[i%CO.length]}`,
+  degree:DEG[i%3],
+  decoyA:`decoy-a-${i}`, decoyB:`decoy-b-${i}`,
+}));
+
+let shown=0;
+const list=document.getElementById('list');
+function dbl(t){ // LinkedIn renders every label twice: visible + screen-reader twin
+  return `<span aria-hidden="true">${t}</span><span class="visually-hidden">${t}</span>`;
+}
+function render(n){
+  const slice=PEOPLE.slice(shown,shown+n);
+  list.insertAdjacentHTML('beforeend', slice.map(p=>`
+    <li>
+      <a href="/in/${p.slug}/"><img alt=""></a>
+      <div>
+        <div><a href="/in/${p.slug}/"><span>${dbl(p.name)}</span></a></div>
+        <div><span>${dbl(p.headline)}</span></div>
+        <div><span>${dbl('· ' + p.degree)}</span></div>
+        <!-- The trap: a card links to OTHER people who are not attendees. -->
+        <div><span><a href="/in/${p.decoyA}/">Decoy A</a>, <a href="/in/${p.decoyB}/">Decoy B</a> &amp; 2 other mutual connections</span></div>
+        <div><button>Message</button><button>Connect</button></div>
+      </div>
+    </li>`).join(''));
+  shown+=slice.length;
+}
+render(12);
+document.querySelector('.scroller').addEventListener('scroll',e=>{
+  const el=e.target;
+  if(el.scrollTop+el.clientHeight>=el.scrollHeight-40) setTimeout(()=>render(12),120);
+});
+</script></body></html>

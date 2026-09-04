@@ -1,0 +1,18 @@
+services:
+  harvester:
+    build: .
+    container_name: attendee-harvester
+    ports:
+      - "8000:8000"
+    environment:
+      BROWSER_MODE: cdp
+      CDP_HOST: host.docker.internal
+      CDP_PORT: "9222"
+      CLIENT: "${CLIENT:-default}"
+    # Linux hosts have no host.docker.internal by default; Docker Desktop
+    # ignores this harmlessly.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

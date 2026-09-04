@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Event Attendee Harvester</title>
+<style>
+  :root{--bg:#f7f7f8;--card:#fff;--ink:#18181b;--mut:#71717a;--line:#e4e4e7;
+        --ok:#15803d;--okbg:#f0fdf4;--warn:#b45309;--warnbg:#fffbeb;--err:#b91c1c;--errbg:#fef2f2;--accent:#1d4ed8;}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0b0b0d;--card:#141417;--ink:#f4f4f5;--mut:#a1a1aa;--line:#27272a;
+          --ok:#4ade80;--okbg:#052e16;--warn:#fbbf24;--warnbg:#2a1f05;--err:#f87171;--errbg:#2a0d0d;--accent:#60a5fa;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--mut);margin:0 0 24px;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+  .steps{list-style:none;padding:0;margin:0}
+  .steps li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;color:var(--mut)}
+  .steps li.done{color:var(--ink)} .steps li.active{color:var(--ink);font-weight:600}
+  .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none;margin-top:2px;
+       display:grid;place-items:center;font-size:11px}
+  li.done .dot{background:var(--ok);border-color:var(--ok);color:var(--card)}
+  li.active .dot{border-color:var(--accent)}
+  .hint{margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-size:13px}
+  .hint.ready{background:var(--okbg);color:var(--ok)}
+  .hint.err{background:var(--errbg);color:var(--err);white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  button{font:inherit;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--line);
+         background:var(--card);color:var(--ink);cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button:disabled{opacity:.42;cursor:not-allowed}
+  button.link{border:none;background:none;color:var(--mut);text-decoration:underline;padding:9px 4px;font-weight:400}
+  .meta{display:flex;gap:22px;flex-wrap:wrap;color:var(--mut);font-size:12px;margin-top:12px}
+  .meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .log{margin-top:12px;font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);
+        max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  th{color:var(--mut);font-weight:600}
+  .scroll{overflow-x:auto}
+  #urlRow{gap:8px} #urlRow input{flex:1;min-width:280px;outline-offset:2px;font:inherit;padding:9px 12px;
+    border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  #phase2 label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12.5px}
+  #phase2 select,#phase2 input{font:inherit;padding:7px 9px;border-radius:7px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .phase{border-left:3px solid var(--line);padding:2px 0 2px 16px;margin:0 0 18px}
+  .phase-h{font-weight:600;font-size:13.5px;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+  .badge{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;
+    background:var(--accent);color:#fff;font-size:11px;font-weight:700}
+  .howto{margin:0 0 12px;padding-left:20px;color:var(--mut);font-size:13px;line-height:1.7}
+  .howto li{margin:3px 0} .howto b{color:var(--ink)}
+  code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+  #folderPath{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  #pasteJson{width:100%;margin-top:10px;font:12px ui-monospace,monospace;padding:9px;
+    border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+  .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Event Attendee Harvester</h1>
+  <p class="sub">LinkedIn event → CSV. <span class="tag" id="mode">…</span> <span class="tag" id="client"></span></p>
+
+  <div class="card" id="importCard">
+    <strong>Scrape from a browser this tool can&rsquo;t drive</strong>
+    <p class="sub" style="margin:6px 0 16px">
+      Use this when the LinkedIn session lives somewhere we can&rsquo;t automate &mdash;
+      an incognito window, or a colleague&rsquo;s login. <b>Nothing needs to be
+      connected, quit, or signed into.</b>
+    </p>
+
+    <div class="phase">
+      <div class="phase-h"><span class="badge">A</span> In the window that&rsquo;s logged in</div>
+      <ol class="howto">
+        <li>Open the <b>attendee list</b> so you can see the people.</li>
+        <li>Come back here and click <b>Copy snippet</b> &mdash; it goes to your clipboard.</li>
+        <li>Back in that window, press <b>&#8984; &#8997; J</b> to open the console.</li>
+        <li>If Chrome warns about pasting: type <code>allow pasting</code>, press Enter.</li>
+        <li>Paste with <b>&#8984;V</b> and press <b>Enter</b>.</li>
+        <li>Wait. You&rsquo;ll see <code>round 1: 12 people</code> counting up, then a popup
+            saying how many were found.</li>
+      </ol>
+      <div class="row"><button class="primary" id="btnCopySnippet">Copy snippet</button></div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="badge">B</span> Back here</div>
+      <ol class="howto" start="7">
+        <li>The results are on your clipboard <i>and</i> saved as
+            <code>linkedin-attendees.json</code> in Downloads &mdash; either will do.</li>
+        <li>Paste into the box below <b>or</b> choose the downloaded file.</li>
+        <li>Click <b>Import rows</b>. The count appears next to the button.</li>
+      </ol>
+      <textarea id="pasteJson" rows="3" placeholder="Paste here (&#8984;V)"></textarea>
+      <div class="row" style="align-items:center;margin-top:4px">
+        <input id="folderPath" placeholder="…or a folder of .json scrapes, e.g. eev_event/raw"
+               style="flex:1;min-width:260px">
+        <button id="btnImportFolder">Consolidate folder</button>
+      </div>
+      <div class="row" style="align-items:center">
+        <button id="btnImport">Import rows</button>
+        <span style="color:var(--mut);font-size:12px">or</span>
+        <input type="file" id="fileJson" accept="application/json,.json" multiple>
+        <span class="tag" id="importMsg"></span>
+      </div>
+    </div>
+
+    <p class="sub" style="margin:14px 0 0">
+      Then: <b>Enrich with Apollo</b> &rarr; <b>Save CSV to disk</b>, further down.
+    </p>
+  </div>
+
+  <div class="card">
+    <ul class="steps">
+      <li id="s1"><span class="dot">1</span><span id="s1t">Connect to Chrome</span></li>
+      <li id="s2"><span class="dot">2</span><span>Open the event or attendees URL</span></li>
+      <li id="s3"><span class="dot">3</span><span>Scrape attendees</span></li>
+      <li id="s4"><span class="dot">4</span><span>Enrich and export</span></li>
+    </ul>
+    <div class="hint" id="hint">Loading…</div>
+    <div class="row" id="urlRow">
+      <input id="eventUrl" placeholder="Paste the event attendees URL, e.g. https://www.linkedin.com/events/…" />
+      <button id="btnOpen" disabled>Open event</button>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnConnect">Launch session</button>
+      <button class="primary" id="btnScrape" disabled>Scrape attendees</button>
+      <button id="btnCsv" disabled>Download CSV</button>
+      <button id="btnSaveCsv" disabled>Save CSV to disk</button>
+      <button class="link" id="btnClear">Clear rows</button>
+      <button class="link" id="btnDump">Dump DOM</button>
+      <button class="link" id="btnDisconnect">Disconnect</button>
+    </div>
+    <div class="meta">
+      <span>Event: <b id="mEvent">—</b></span>
+      <span>Found: <b id="mCount">0</b></span>
+      <span>Rounds: <b id="mRounds">0</b></span>
+      <span>Tabs: <b id="mTabs">0</b></span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card" id="phase2" hidden>
+    <strong>Phase 2 &mdash; open profiles</strong>
+    <p class="sub" style="margin:6px 0 12px">
+      Opens each scraped profile in this Chrome session and holds it open for the
+      dwell time below, so anything running on the page can finish.
+    </p>
+    <div class="row" style="align-items:center">
+      <label>Mode
+        <select id="pMode">
+          <option value="visit">Visit (one reused tab)</option>
+          <option value="tabs">Keep tabs open (capped)</option>
+        </select>
+      </label>
+      <label>Limit <input type="number" id="pLimit" min="1" placeholder="all" style="width:82px"></label>
+      <label>Dwell ms <input type="number" id="pMin" value="120000" step="500" style="width:88px">
+        &ndash; <input type="number" id="pMax" value="120000" step="500" style="width:88px"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnProfiles">Open profiles</button>
+      <button id="btnStopProfiles" disabled>Stop</button>
+    </div>
+    <div class="meta">
+      <span>Progress: <b id="pProg">0 / 0</b></span>
+      <span>Opened: <b id="pOpened">0</b></span>
+      <span>Failed: <b id="pFailed">0</b></span>
+      <span id="pEta"></span>
+    </div>
+    <div class="log" id="pLog"></div>
+  </div>
+
+  <div class="card" id="phase3" hidden>
+    <strong>Phase 3 &mdash; enrich via Apollo</strong> <span class="tag" id="keyTag"></span>
+    <p class="sub" style="margin:6px 0 12px">
+      Sends the scraped profile URLs to Apollo&rsquo;s bulk endpoint in batches of 10.
+      Never touches LinkedIn, so it takes minutes rather than hours.
+    </p>
+    <div class="row" style="align-items:center">
+      <label>Limit <input type="number" id="eLimit" min="1" placeholder="all" style="width:82px"></label>
+      <label style="gap:5px"><input type="checkbox" id="eOnlyNew" checked> only people not yet enriched</label>
+      <label style="gap:5px"><input type="checkbox" id="eRetry"> retry previous no-matches</label>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnEnrich">Enrich with Apollo</button>
+      <button id="btnStopEnrich" disabled>Stop</button>
+    </div>
+    <div class="meta">
+      <span>Progress: <b id="eProg">0 / 0</b></span>
+      <span>Matched: <b id="eMatched">0</b></span>
+      <span>Phones: <b id="ePhones">0</b></span>
+      <span>Credits: <b id="eCredits">0</b></span>
+    </div>
+    <div class="log" id="eLog"></div>
+    <div class="hint err" id="eWarn" hidden></div>
+  </div>
+
+  <div class="card" id="preview" hidden>
+    <strong>Preview</strong> <span class="tag" id="pCount"></span>
+    <div class="scroll"><table id="tbl">
+      <thead><tr><th>Name</th><th>Company</th><th>Title</th><th>Email</th><th>Phone</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const post = p => fetch(p, {method:'POST'}).then(async r => {
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+});
+
+function setStep(el, state){ el.className = state; }
+
+function render(d){
+  const s = d.session, sc = d.scrape;
+  $('mode').textContent = 'mode: ' + s.mode;
+  $('client').textContent = 'client: ' + s.client;
+  $('s1t').textContent = s.mode === 'cdp' ? 'Connect to Chrome (started on the host)' : 'Launch Chrome session';
+
+  setStep($('s1'), s.connected ? 'done' : 'active');
+  setStep($('s2'), s.ready ? 'done' : (s.connected ? 'active' : ''));
+  setStep($('s3'), sc.count ? 'done' : (s.ready ? 'active' : ''));
+  setStep($('s4'), (d.enriched || d.have_results) ? 'active' : '');
+
+  const err = s.error || sc.error;
+  const hint = $('hint');
+  hint.className = 'hint' + (err ? ' err' : (s.ready ? ' ready' : ''));
+  hint.textContent = err ? err : s.hint;
+
+  $('btnOpen').disabled    = !s.connected;
+  $('eventUrl').style.outline = (s.connected && !s.ready) ? '2px solid var(--accent)' : 'none';
+  $('btnConnect').disabled = s.connected;
+  $('btnConnect').textContent = s.connected
+    ? 'Connected \u2713'
+    : (s.mode === 'cdp' ? 'Connect to Chrome' : 'Launch session');
+
+  // Highlight the one button that is the current next step, so a disabled
+  // primary button is never the most eye-catching thing on the page.
+  const next = !s.connected ? 'btnConnect'
+             : !s.logged_in ? null
+             : !s.ready     ? 'btnOpen'
+             : !sc.count    ? 'btnScrape'
+             : 'btnCsv';
+  ['btnConnect','btnOpen','btnScrape','btnCsv'].forEach(id =>
+    $(id).classList.toggle('primary', id === next));
+  $('btnScrape').disabled  = !s.ready || sc.running;
+  $('btnScrape').textContent = sc.running ? 'Scraping…' : 'Scrape attendees';
+  $('btnCsv').disabled     = !d.have_results;
+  $('btnSaveCsv').disabled = !d.have_results;
+  $('mEvent').textContent  = s.event_name || '—';
+  $('mCount').textContent  = sc.count || 0;
+  $('mRounds').textContent = sc.rounds || 0;
+  $('mTabs').textContent   = s.tab_count || 0;
+  $('log').textContent     = sc.message || '';
+
+  const pr = d.profiles || {};
+  $('phase2').hidden = !d.have_results;
+  $('btnProfiles').disabled     = !d.have_results || pr.running || sc.running || !s.connected;
+  $('btnProfiles').textContent  = pr.running ? 'Opening…' : 'Open profiles';
+  $('btnStopProfiles').disabled = !pr.running;
+  $('pProg').textContent   = (pr.index || 0) + ' / ' + (pr.total || 0);
+  $('pOpened').textContent = pr.opened || 0;
+  $('pFailed').textContent = pr.failed || 0;
+  $('pLog').textContent    = pr.error || pr.message || '';
+  if (pr.running && pr.index && pr.total) {
+    const per = (Number($('pMin').value||120000) + Number($('pMax').value||120000)) / 2;
+    const left = Math.round((pr.total - pr.index) * per / 1000);
+    $('pEta').textContent = '~' + Math.floor(left/60) + 'm ' + (left%60) + 's left';
+  } else { $('pEta').textContent = ''; }
+
+  const en = d.enrich || {};
+  $('phase3').hidden = !d.have_results;
+  $('keyTag').textContent = en.has_key ? 'API key loaded' : 'no APOLLO_API_KEY in .env';
+  $('btnEnrich').disabled = !d.have_results || en.running || sc.running || !en.has_key;
+  $('btnEnrich').textContent = en.running ? 'Enriching\u2026' : 'Enrich with Apollo';
+  $('btnStopEnrich').disabled = !en.running;
+  $('eProg').textContent    = (en.index || 0) + ' / ' + (en.total || 0);
+  $('eMatched').textContent = en.matched || 0;
+  $('ePhones').textContent  = en.phones || 0;
+  $('eCredits').textContent = en.credits || 0;
+  $('eLog').textContent     = en.error || en.message || '';
+  const warn = $('eWarn');
+  warn.hidden = !en.warning;
+  warn.textContent = en.warning ? ('\u26a0 Apollo: ' + en.warning) : '';
+
+  if (d.have_results && !sc.running) loadPreview();
+}
+
+let previewed = false;
+async function loadPreview(){
+  if (previewed) return; previewed = true;
+  const d = await fetch('/api/results?limit=25').then(r=>r.json());
+  $('pCount').textContent = d.count + ' rows';
+  $('tbl').tBodies[0].innerHTML = d.rows.map(r => `<tr>
+    <td>${esc(r.name)}</td>
+    <td>${esc(r.apollo_company || r.company)}</td>
+    <td>${esc(r.apollo_title || r.title)}</td>
+    <td>${esc(r.apollo_email)}</td>
+    <td>${esc(r.apollo_phone)}</td></tr>`).join('');
+  $('preview').hidden = false;
+}
+const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function tick(){
+  try { render(await fetch('/api/status').then(r=>r.json())); }
+  catch(e){ $('hint').className='hint err'; $('hint').textContent = 'Backend unreachable: ' + e.message; }
+}
+
+$('btnConnect').onclick = async e => { e.target.disabled = true; try{ await post('/api/connect'); } catch(err){ alert(err.message); } tick(); };
+$('btnScrape').onclick  = async e => { e.target.disabled = true; previewed = false; $('preview').hidden = true;
+                                       try{ await post('/api/scrape'); } catch(err){ alert(err.message); } tick(); };
+$('btnOpen').onclick    = async e => {
+  const url = $('eventUrl').value.trim();
+  if (!url) return alert('Paste the event URL first.');
+  e.target.disabled = true; e.target.textContent = 'Opening…';
+  try {
+    const r = await fetch('/api/open-event', {method:'POST', headers:{'Content-Type':'application/json'},
+                                              body: JSON.stringify({url})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+  } catch(err){ alert(err.message); }
+  e.target.textContent = 'Open event'; tick();
+};
+$('btnCsv').onclick     = () => location.href = '/api/export.csv';
+$('btnSaveCsv').onclick = async () => {
+  try { const d = await post('/api/export-file');
+        alert(`Saved ${d.rows} rows (${d.bytes} bytes) to:\n\n${d.path}`); }
+  catch(err){ alert(err.message); }
+};
+$('btnProfiles').onclick = async e => {
+  const mode = $('pMode').value, total = Number($('pLimit').value) || null;
+  if (mode === 'tabs' && !confirm('Tabs mode is capped (default 20). Opening hundreds of tabs will exhaust Chrome. Continue?')) return;
+  e.target.disabled = true;
+  try {
+    const r = await fetch('/api/open-profiles', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode, limit: total,
+        delay_min_ms: Number($('pMin').value)||null, delay_max_ms: Number($('pMax').value)||null})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.statusText);
+  } catch(err){ alert(err.message); }
+  tick();
+};
+$('btnEnrich').onclick = async e => {
+  e.target.disabled = true;
+  try {
+    const lim = Number($('eLimit').value) || null;
+    const r = await fetch('/api/enrich', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({limit: lim, only_new: $('eOnlyNew').checked,
+                            retry_missed: $('eRetry').checked})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.statusText);
+  } catch(err){ alert(err.message); }
+  tick();
+};
+$('btnStopEnrich').onclick = async () => { try { await post('/api/stop-enrich'); } catch(err){ alert(err.message); } tick(); };
+$('btnStopProfiles').onclick = async () => { try { await post('/api/stop-profiles'); } catch(err){ alert(err.message); } tick(); };
+$('btnCopySnippet').onclick = async e => {
+  try {
+    const js = await fetch('/api/snippet.js').then(r => r.text());
+    await navigator.clipboard.writeText(js);
+    e.target.textContent = 'Copied \u2713';
+    setTimeout(() => e.target.textContent = 'Copy snippet', 2500);
+  } catch (err) { alert('Could not copy: ' + err.message); }
+};
+
+async function importPayload(text) {
+  let payload;
+  try { payload = JSON.parse(text); }
+  catch (e) { return alert('That is not valid JSON.'); }
+  if (!payload.rows) return alert('No "rows" in that JSON.');
+  try {
+    const r = await fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'},
+                                          body: JSON.stringify(payload)});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    $('importMsg').textContent = 'imported ' + j.imported + ' rows';
+    $('pasteJson').value = ''; previewed = false; tick();
+  } catch (err) { alert(err.message); }
+}
+$('btnImport').onclick = () => {
+  const t = $('pasteJson').value.trim();
+  if (!t) return alert('Paste the JSON first.');
+  importPayload(t);
+};
+$('fileJson').onchange = async e => {
+  const files = [...e.target.files]; if (!files.length) return;
+  let total = 0;
+  for (let i = 0; i < files.length; i++) {
+    try {
+      const payload = JSON.parse(await files[i].text());
+      payload.append = i > 0;              // first replaces, rest merge in
+      const r = await fetch('/api/import', {method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const j = await r.json();
+      if (r.ok) total = j.imported;
+    } catch (err) { console.warn(files[i].name, err); }
+  }
+  $('importMsg').textContent = files.length + ' files \u2192 ' + total + ' unique people';
+  e.target.value = ''; previewed = false; tick();
+};
+$('btnImportFolder').onclick = async () => {
+  const path = $('folderPath').value.trim();
+  if (!path) return alert('Enter the folder path first.');
+  try {
+    const r = await fetch('/api/import-folder', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({path})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    $('importMsg').textContent =
+      `${j.files} files, ${j.entries} entries \u2192 ${j.unique} unique (${j.duplicates} dupes)`;
+    previewed = false; tick();
+  } catch (err) { alert(err.message); }
+};
+$('btnClear').onclick = async () => {
+  if (!confirm('Discard the current rows?')) return;
+  try { await post('/api/clear'); previewed = false; $('preview').hidden = true; }
+  catch(err){ alert(err.message); }
+  tick();
+};
+$('btnDisconnect').onclick = async () => { await post('/api/disconnect'); tick(); };
+$('btnDump').onclick    = async () => { try { const d = await post('/api/dump');
+                                        alert(`Saved ${d.bytes} bytes to\n${d.saved}\n\nprofile links: ${d.profileLinks}\ndialogs: ${d.dialogs}`);
+                                      } catch(err){ alert(err.message); } };
+
+tick(); setInterval(tick, 1500);
+</script>
+</body>
+</html>

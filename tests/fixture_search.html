@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>john | Search | LinkedIn</title>
+<style>body{font-family:sans-serif;margin:0;padding:12px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+img{width:48px;height:48px;background:#ccd;border-radius:50%}</style></head>
+<body><div class="_9f8ab21c"><div class="a71bc402" id="results"></div></div>
+<script>
+// Mirrors the REAL structure of LinkedIn people-search results, captured from
+// a live page: results are NOT in <li>, every class name is hashed, each real
+// result is linked SIX times, and each card ends with a short
+// "A, B & N other mutual connections" block linking to people who are NOT
+// results. Those two facts are what the extractor has to survive.
+const P=[...Array(10)].map((_,i)=>({
+  slug:`real-person-${i}`, name:`Real Person ${i}`,
+  headline:`Chief Product Officer at Company ${i}`,
+  loc:`City ${i}, Country`, degree:['1st','2nd','3rd'][i%3],
+  mutA:`mutual-a-${i}`, mutB:`mutual-b-${i}`,
+}));
+const dbl=t=>`<span aria-hidden="true">${t}</span><span class="visually-hidden">${t}</span>`;
+document.getElementById('results').innerHTML = P.map(p=>`
+<div class="_3f7d1a44"><div class="b21e9c07"><div class="c4419f2a">
+  <a class="d81f2b13" href="/in/${p.slug}/"><img alt=""></a>
+  <a class="d81f2b13" href="/in/${p.slug}/"></a>
+  <div class="e7c1a930">
+    <a class="f0b2d541" href="/in/${p.slug}/"><span>${dbl(p.name)}</span></a>
+    <a class="f0b2d541" href="/in/${p.slug}/" aria-label="View profile"></a>
+    <span>${dbl('· ' + p.degree)}</span>
+    <p class="a1b2c3d4">${dbl(p.headline)}</p>
+    <p class="b2c3d4e5">${dbl(p.loc)}</p>
+    <a class="d81f2b13" href="/in/${p.slug}/">Message</a>
+    <a class="d81f2b13" href="/in/${p.slug}/">Follow</a>
+    <p class="c3d4e5f6"><a href="/in/${p.mutA}/">Mutual A${i_(p)}</a>, <a href="/in/${p.mutB}/">Mutual B${i_(p)}</a> &amp; 2 other mutual connections</p>
+  </div>
+</div></div></div>`).join('');
+function i_(p){ return p.slug.split('-').pop(); }
+</script></body></html>
